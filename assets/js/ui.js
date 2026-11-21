@@ -1,4 +1,4 @@
-/* TradeUp prototype: icon sprite, range bar, and the screen map used for testing. */
+/* TradeUp prototype: icon sprite, range bar, demo strip, and the screen map used for testing (with the API server field). */
 (function () {
   "use strict";
   var P = {
@@ -45,8 +45,19 @@
     ["Khách hàng", [["S1 · Trang chủ", "index.html"], ["S2 · Khai thông tin xe", "flow.html#/intake"], ["S3 · Đang xử lý", "flow.html#/processing"], ["S4 · Kết quả + tiền bù", "flow.html#/result"], ["S5 · Chưa ước tính được", "flow.html#/error"], ["S6 · Ảnh xe + hư hỏng", "flow.html#/photos"], ["S7 · Đặt lịch + xác nhận gửi", "flow.html#/book"], ["S8 · Theo dõi hồ sơ", "flow.html#/track"]]],
     ["Thẩm định viên", [["A1 · Danh sách hồ sơ", "dealer.html#/"], ["A2 · Chi tiết + nhập giá", "dealer.html#/case/TU-000124"], ["A3 · Xác nhận chốt giá", "dealer.html#/case/TU-000124"]]]
   ];
+  /* docs/ui-integration.md §5.9: synthetic data must be flagged on every screen that shows numbers.
+     Shown until the API says otherwise (is_synthetic = false hides it). */
+  function mountDemoStrip() {
+    if (document.querySelector(".demo-strip")) return;
+    document.body.insertAdjacentHTML("afterbegin", '<div class="demo-strip" role="note">DEMO: dữ liệu mẫu, giá không có giá trị tham khảo</div>');
+  }
+  function setSynthetic(flag) {
+    var el = document.querySelector(".demo-strip");
+    if (flag === false) { if (el) el.hidden = true; } else { mountDemoStrip(); document.querySelector(".demo-strip").hidden = false; }
+  }
   function mountMap() {
-    var s = Store.get(), html = '<button class="proto-fab" type="button" id="protoOpen" aria-haspopup="dialog">' + icon("map") + '<span>Sơ đồ màn hình</span></button><dialog class="sheet proto" id="protoDlg" aria-labelledby="protoTitle"><div class="sheet-head"><h2 id="protoTitle">Sơ đồ màn hình</h2><button class="iconbtn" type="button" data-close aria-label="Đóng">' + icon("x") + '</button></div><p class="sheet-note">Bản prototype để thử luồng. Dữ liệu là giả lập và chỉ lưu trên trình duyệt này.</p>';
+    mountDemoStrip();
+    var s = Store.get(), html = '<button class="proto-fab" type="button" id="protoOpen" aria-haspopup="dialog">' + icon("map") + '<span>Sơ đồ màn hình</span></button><dialog class="sheet proto" id="protoDlg" aria-labelledby="protoTitle"><div class="sheet-head"><h2 id="protoTitle">Sơ đồ màn hình</h2><button class="iconbtn" type="button" data-close aria-label="Đóng">' + icon("x") + '</button></div><p class="sheet-note">Bản thử nối API TradeUp. Giá do engine trên máy chủ tính; hồ sơ đặt lịch chỉ lưu trên trình duyệt này.</p><form class="api-form" id="apiForm"><label class="field-label" for="apiIn">Máy chủ API <span id="apiState" class="api-state">đang kiểm tra…</span></label><div class="api-row"><input class="input" id="apiIn" type="url" autocomplete="off" spellcheck="false"><button class="btn sm" type="submit">Lưu</button></div><small class="sheet-note">Chạy: <code>uvicorn src.main:app</code> rồi mở <code>/web/</code>, hoặc thêm <code>?api=https://…</code> vào đường dẫn.</small></form>';
     SCREENS.forEach(function (g) {
       html += "<h3>" + g[0] + '</h3><ul class="proto-list">';
       g[1].forEach(function (l) { html += '<li><a href="' + l[1] + '">' + l[0] + "</a></li>"; });
@@ -63,11 +74,19 @@
     document.getElementById("protoErr").addEventListener("change", function (e) { Store.get().simulateError = e.target.checked; Store.save(); });
     document.getElementById("protoSample").addEventListener("click", function () {
       var d = Store.get().draft;
-      Object.assign(d, { brand: "Toyota", model: "Vios", year: 2019, trim: "1.5G", km: 62000, kmConfirmed: false, accident: "none", flood: "no", owners: "1", step: 5 });
+      Object.assign(d, { brand: "Toyota", model: "Vios", year: 2019, trim: "1.5G", km: 62000, fuel: "xang", accident: "none", flood: "no", owners: "1", step: 6, quote: null });
       Store.save(); dlg.close();
-      if (/flow\.html$/.test(location.pathname) && location.hash === "#/result") window.dispatchEvent(new HashChangeEvent("hashchange"));
-      else location.href = "flow.html#/result";
+      if (/flow\.html$/.test(location.pathname) && location.hash === "#/processing") window.dispatchEvent(new HashChangeEvent("hashchange"));
+      else location.href = "flow.html#/processing";
     });
+    var apiIn = document.getElementById("apiIn"), apiState = document.getElementById("apiState");
+    apiIn.value = TU.api.base();
+    function ping() {
+      apiState.textContent = "đang kiểm tra…"; apiState.className = "api-state";
+      TU.api.health().then(function (r) { var ok = r.status === 200; apiState.textContent = ok ? "đã kết nối" : "lỗi " + r.status; apiState.className = "api-state " + (ok ? "ok" : "bad"); }, function () { apiState.textContent = "chưa kết nối"; apiState.className = "api-state bad"; });
+    }
+    document.getElementById("protoOpen").addEventListener("click", ping);
+    document.getElementById("apiForm").addEventListener("submit", function (e) { e.preventDefault(); var ok = TU.api.setBase(apiIn.value.trim()); apiIn.value = TU.api.base(); ping(); toast(ok ? "Đã lưu máy chủ API, tải lại trang để dùng" : "Chỉ đổi được sang máy chủ chạy trên máy này (localhost); trang mở từ máy chủ luôn dùng chính máy chủ đó"); });
     document.getElementById("protoReset").addEventListener("click", function () { Store.reset(); location.href = "index.html"; });
   }
 
@@ -78,5 +97,5 @@
     clearTimeout(toast.t); toast.t = setTimeout(function () { t.classList.remove("show"); }, 2600);
   }
 
-  window.UI = { icon: icon, rangeBar: rangeBar, mountMap: mountMap, toast: toast };
+  window.UI = { icon: icon, rangeBar: rangeBar, mountMap: mountMap, toast: toast, setSynthetic: setSynthetic };
 })();

@@ -7,7 +7,7 @@
 <meta name="description" content="TradeUp: biết trước khoảng giá xe cũ, khoản tiền cần bù và trả góp mỗi tháng khi đổi sang VinFast. Giá tạm tính, đại lý chốt giá chính thức.">
 <title>TradeUp — Đổi xe cũ, lên đời VinFast</title>
 <link rel="preload" as="image" href="assets/img/hero.jpg">
-<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/base.css?v=g2-1b">
 </head>
 <body>
 <header class="topbar">
@@ -32,16 +32,16 @@
       <p class="hero-lead">Biết trước khoản tiền cần bù và chi phí trả góp mỗi tháng. Xe cũ hãng nào cũng được, có con số trong 3 phút.</p>
       <div class="hero-actions">
         <a class="btn" href="#estimate">Ước tính xe của tôi <svg class="ic" aria-hidden="true"><use href="#i-arrow"/></svg></a>
-        <a class="btn ghost" href="#models">Khám phá xe VinFast</a>
+        <button class="btn ghost" type="button" id="heroChat"><svg class="ic" aria-hidden="true"><use href="#i-chat"/></svg>Hỏi trợ lý TradeUp</button>
       </div>
       <div class="hero-meta">
-        <span><svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg>Giá thu mua tạm tính · Đại lý xác nhận giá chính thức</span>
+        <span><svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg>Giá tạm tính từ giá rao · Thẩm định viên chốt giá chính thức</span>
         <span><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>Đã có mã hồ sơ? <a class="link" href="flow.html#/track">Theo dõi hồ sơ</a></span>
       </div>
     </div>
     <div class="hero-visual">
-      <aside class="hero-card" aria-label="Khoản bù dự kiến mỗi tháng">
-        <strong>Khoản bù dự kiến / tháng</strong>
+      <aside class="hero-card" aria-label="Khoản trả góp ước tính, tháng đầu">
+        <strong>Trả góp ước tính · tháng đầu</strong>
         <a class="field" href="#estimate"><span>Xe hiện tại</span><b id="heroCar">Chọn xe <svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></b></a>
         <a class="field" href="#models"><span>Mẫu VinFast</span><b><span id="heroModel">VF 7</span> <svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></b></a>
         <div class="amount" id="heroMonthly" aria-live="polite">—</div>
@@ -71,21 +71,22 @@
           <label>Dòng xe<select class="control" id="model"></select></label>
           <label>Năm sản xuất<input class="control num" id="year" type="number" inputmode="numeric" min="1990" max="2026" value="2019" required></label>
           <label>Số km đã đi<input class="control num" id="km" type="text" inputmode="numeric" value="62.000" autocomplete="off" required></label>
-          <label class="full">Tình trạng<select class="control" id="condition"><option value="good">Tốt, không lỗi lớn</option><option value="normal">Đã qua sử dụng, từng va chạm nhẹ</option><option value="rough">Có hư hỏng cần kiểm tra</option></select></label>
+          <label>Nhiên liệu<select class="control" id="fuel"><option value="xang">Xăng</option></select></label>
+          <label>Tình trạng<select class="control" id="condition"><option value="good">Tốt, không lỗi lớn</option><option value="normal">Đã qua sử dụng, từng va chạm nhẹ</option><option value="rough">Có hư hỏng cần kiểm tra</option></select></label>
           <label class="full">Muốn đổi sang<select class="control" id="target"></select></label>
         </div>
         <div class="form-error" id="formError" role="alert"></div>
         <button class="btn block" type="submit">Tính khoản tiền dự kiến <svg class="ic" aria-hidden="true"><use href="#i-arrow"/></svg></button>
-        <p class="form-hint" id="formHint">Kết quả minh họa, không phải báo giá hay ưu đãi đang có hiệu lực. Muốn tả xe kỹ hơn? <a class="link" href="flow.html#/intake">Khai từng bước với trợ lý</a></p>
+        <p class="form-hint" id="formHint">Số do engine TradeUp tính trên máy chủ, tạm tính. Muốn tả xe kỹ hơn? <a class="link" href="flow.html#/intake">Khai từng bước</a></p>
       </form>
     </div>
     <div class="val-preview">
       <div class="car-stage">
-        <span class="pill">Kết quả minh họa</span>
+        <span class="pill">Ước tính từ giá rao</span>
         <img src="assets/img/used-car.jpg" width="125" height="82" alt="Hình minh họa xe đã qua sử dụng">
       </div>
       <div class="result-card" id="resultCard" aria-live="polite">
-        <h3>Khoảng giá thu mua tạm tính</h3>
+        <h3>Giá đề xuất xe cũ · tạm tính</h3>
         <div id="resultBody">
           <div class="big">—</div>
           <div class="skeleton" style="margin:22px 0 12px"></div>
@@ -101,10 +102,10 @@
   <div class="container">
     <div class="section-head">
       <h2 class="display">VinFast phù hợp với<br>hành trình của bạn.</h2>
-      <p>Chọn một mẫu xe để đưa vào phép tính. Giá bán và ưu đãi thực tế cần được cập nhật từ nguồn chính thức.</p>
+      <p>Chọn một mẫu xe để đưa vào phép tính. Danh mục và giá niêm yết lấy từ máy chủ TradeUp (trang giá VinFast).</p>
     </div>
     <div class="model-grid" id="modelGrid"></div>
-    <p class="model-note">Hình ảnh, danh sách mẫu xe và giá chỉ phục vụ bản thử giao diện. Kiểm tra danh mục, phiên bản và giá bán hiện hành trước khi triển khai.</p>
+    <p class="model-note">* Giá niêm yết thấp nhất của mẫu, đã gồm VAT và pin, chưa gồm phí lăn bánh. Hình ảnh chỉ minh họa.</p>
   </div>
 </section>
 
@@ -118,10 +119,10 @@
       <div class="equation">
         <div class="eq-item"><svg class="ic" aria-hidden="true"><use href="#i-tag"/></svg>Giá xe VinFast<span class="v" id="eqList"></span></div><div class="operator" aria-hidden="true">−</div>
         <div class="eq-item"><svg class="ic" aria-hidden="true"><use href="#i-car"/></svg>Giá xe cũ dự kiến<span class="v" id="eqUsed"></span></div><div class="operator op-2" aria-hidden="true">−</div>
-        <div class="eq-item"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>Ưu đãi đủ điều kiện<span class="v" id="eqPromo"></span></div><div class="operator" aria-hidden="true">=</div>
+        <div class="eq-item"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Ưu đãi đủ điều kiện<span class="v" id="eqPromo"></span></div><div class="operator" aria-hidden="true">=</div>
         <div class="eq-item result"><svg class="ic" aria-hidden="true"><use href="#i-calc"/></svg>Khoản cần bù<span class="v" id="eqTop"></span></div>
       </div>
-      <p class="calc-note">Khoản trả góp mỗi tháng được tính riêng theo số tiền vay, lãi suất và kỳ hạn giả định. Mọi khoản tiền do hệ thống tính bằng công thức cố định, không do AI tự suy ra.</p>
+      <p class="calc-note">Khoản trả góp được tính riêng theo số tiền vay, lãi suất và kỳ hạn giả định; tháng đầu cao nhất, các tháng sau giảm dần. Khoản cần bù chưa gồm phí lăn bánh. Mọi khoản tiền do hệ thống tính bằng công thức cố định, không do AI tự suy ra.</p>
     </div>
   </div>
 </section>
@@ -144,7 +145,7 @@
     </div>
     <div class="faq-list">
       <details open><summary>Giá ở đây có phải giá chính thức không?<svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></summary><p>Không. Mọi giá trên TradeUp là tạm tính, dựa trên xe tương đồng đang rao và thông tin bạn khai. Giá chính thức do thẩm định viên tại đại lý chốt sau khi xem xe thật.</p></details>
-      <details><summary>TradeUp không biết được những gì?<svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></summary><p>Hệ thống không thấy được máy, gầm và giấy tờ xe. Lãi suất chỉ là số minh họa. Ưu đãi có thể thay đổi theo đợt và do đại lý xác nhận lần cuối.</p></details>
+      <details><summary>TradeUp không biết được những gì?<svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></summary><p>Hệ thống không thấy được máy, gầm và giấy tờ xe, và chưa tính tình trạng xe vào giá. Lãi suất là giả định của nhóm (dữ liệu cũ, luôn kèm cảnh báo). Ưu đãi có thể thay đổi theo đợt và do đại lý xác nhận lần cuối.</p></details>
       <details><summary>Xe của tôi không phải VinFast thì có đổi được không?<svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></summary><p>Được. TradeUp nhận xe cũ của mọi hãng, xăng hay điện. Xe mới thì chỉ tính cho các mẫu VinFast.</p></details>
       <details><summary>Các con số được tính thế nào?<svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></summary><p>Khoản cần bù bằng giá xe VinFast trừ ưu đãi đủ điều kiện, trừ giá xe cũ tạm tính. Mỗi con số bấm vào được để xem nguồn và ngày dữ liệu. Tiền do công thức cố định tính, trợ lý AI chỉ giúp hiểu thông tin bạn nhập và giải thích kết quả.</p></details>
       <details><summary>Thông tin của tôi được gửi cho ai?<svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg></summary><p>Chỉ khi bạn bấm xác nhận gửi hồ sơ, thông tin xe, khoảng giá tạm tính, họ tên và số điện thoại mới được gửi cho đại lý bạn chọn. Lịch sử trò chuyện không được gửi.</p></details>
@@ -161,13 +162,14 @@
   <div class="container footer-row">
     <a class="logo" href="#home">Trade<span>Up</span></a>
     <div class="footer-links"><a href="#how">Cách hoạt động</a><a href="#models">Dòng xe VinFast</a><a href="#estimate">Ước tính</a><a href="#faq">Câu hỏi thường gặp</a><a href="dealer.html">Dành cho đại lý</a></div>
-    <small>© 2026 TradeUp · Bản prototype, số liệu minh họa</small>
+    <small>© 2026 TradeUp · Bản prototype nối API, dữ liệu mẫu khi máy chủ chạy dữ liệu mẫu</small>
   </div>
 </footer>
 
-<script src="assets/js/data.js"></script>
-<script src="assets/js/store.js"></script>
-<script src="assets/js/ui.js"></script>
-<script src="assets/js/landing.js"></script>
+<script src="assets/js/data.js?v=g2-1b"></script>
+<script src="assets/js/store.js?v=g2-1b"></script>
+<script src="assets/js/ui.js?v=g2-1b"></script>
+<script src="assets/js/chat.js?v=g2-1b"></script>
+<script src="assets/js/landing.js?v=g2-1b"></script>
 </body>
 </html>

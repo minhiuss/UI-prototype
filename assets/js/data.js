@@ -1,152 +1,205 @@
-/* TradeUp prototype: mock data + deterministic money engine.
-   Every figure here is illustrative. Replace with the backend engine (src/) when the API exists.
-   Unit for money: triệu VND (million), unless a name says otherwise. */
+/* TradeUp web: API client for the TradeUp engine + agent, and display helpers.
+   Contract: docs/ui-integration.md. Every money figure comes from the server (integer VND);
+   this file only formats numbers, it never adds, subtracts or recomputes money (§5.8). */
 (function () {
   "use strict";
 
-  var NOW_YEAR = 2026;
-  var DATA_DATE = "10/11/2026";
-  var COMPS_SOURCE = "Tin rao mẫu (dữ liệu giả lập của prototype)";
-  var MIN_COMPS = 5;
-
-  // base = illustrative listing price of a current-year car, in triệu
-  var USED = {
-    Toyota: { Vios: { base: 650, trims: ["1.5E MT", "1.5E CVT", "1.5G"] }, "Corolla Cross": { base: 960, trims: ["1.8G", "1.8V", "1.8HV"] }, Fortuner: { base: 1280, trims: ["2.4 MT", "2.4 AT", "2.8 Legender"] }, Innova: { base: 880, trims: ["2.0E", "2.0G", "2.0V"] }, Camry: { base: 1380, trims: ["2.0G", "2.5Q"] } },
-    Honda: { City: { base: 640, trims: ["G", "L", "RS"] }, "CR-V": { base: 1180, trims: ["E", "G", "L"] }, Civic: { base: 890, trims: ["E", "G", "RS"] } },
-    Hyundai: { Accent: { base: 590, trims: ["1.4 MT", "1.4 AT", "1.4 AT Đặc biệt"] }, Creta: { base: 760, trims: ["Tiêu chuẩn", "Đặc biệt", "Cao cấp"] }, Tucson: { base: 1010, trims: ["2.0 Tiêu chuẩn", "2.0 Đặc biệt", "1.6 Turbo"] }, "Grand i10": { base: 470, trims: ["1.2 MT", "1.2 AT"] } },
-    Ford: { Ranger: { base: 960, trims: ["XLS", "XLT", "Wildtrak"] }, Everest: { base: 1390, trims: ["Ambiente", "Sport", "Titanium"] } },
-    Mazda: { Mazda3: { base: 760, trims: ["1.5 Deluxe", "1.5 Luxury", "1.5 Premium"] }, "CX-5": { base: 960, trims: ["2.0 Deluxe", "2.0 Luxury", "2.0 Premium"] } },
-    Kia: { Morning: { base: 440, trims: ["MT", "AT", "X-Line"] }, Seltos: { base: 750, trims: ["1.4 Deluxe", "1.4 Luxury", "1.4 Premium"] }, K3: { base: 700, trims: ["1.6 MT", "1.6 Luxury", "1.6 Premium"] } },
-    Mitsubishi: { Xpander: { base: 700, trims: ["MT", "AT", "AT Premium"] } },
-    VinFast: { Fadil: { base: 430, trims: ["Tiêu chuẩn", "Nâng cao", "Cao cấp"] }, "Lux A2.0": { base: 900, trims: ["Tiêu chuẩn", "Nâng cao", "Cao cấp"] }, "VF e34": { base: 620, trims: ["Tiêu chuẩn"] } }
-  };
-
-  var VINFAST = [
-    { name: "VF 3", desc: "Đô thị linh hoạt", price: 299, promo: 10, img: "assets/img/vf3.jpg" },
-    { name: "VF 5", desc: "Nhỏ gọn, hiện đại", price: 529, promo: 20, img: "assets/img/vf5.jpg" },
-    { name: "VF 6", desc: "Cân bằng đa dụng", price: 689, promo: 25, img: "assets/img/vf6.jpg" },
-    { name: "VF 7", desc: "Mạnh mẽ, cá tính", price: 799, promo: 30, img: "assets/img/vf7.jpg" },
-    { name: "VF 8", desc: "Tiện nghi vượt trội", price: 1019, promo: 40, img: "assets/img/vf8.jpg" },
-    { name: "VF 9", desc: "Rộng rãi, đẳng cấp", price: 1499, promo: 60, img: "assets/img/vf9.jpg" }
-  ];
-
-  var PROMO = { name: "Ưu đãi đổi xe (minh họa)", wave: "Đợt tháng 11/2026", validTo: "30/11/2026", source: "Số minh họa của prototype, chưa phải chính sách VinFast" };
-  var LOAN = { monthlyRate: 0.0075, date: DATA_DATE, terms: [12, 24, 36, 48, 60, 72, 84] };
+  /* ---------- static UI data (labels only, no prices) ---------- */
   var DEALERS = ["VinFast Demo Long Biên", "VinFast Demo Phạm Văn Đồng", "VinFast Demo Quận 7"];
   var SLOTS = ["09:00", "10:30", "14:00", "15:30", "17:00"];
-
-  var ACCIDENT = { none: { label: "Không va chạm", pct: 0 }, light: { label: "Va chạm nhẹ, đã sửa", pct: 0.03 }, heavy: { label: "Va chạm nặng", pct: 0.10 } };
-  var FLOOD = { no: { label: "Không ngập nước", pct: 0 }, yes: { label: "Từng ngập nước", pct: 0.15 } };
-  var OWNERS = { "1": { label: "1 đời chủ", pct: 0 }, "2": { label: "2 đời chủ", pct: 0.01 }, "3": { label: "3 đời chủ trở lên", pct: 0.025 } };
-
-  // deduction table for damages found in photos (triệu), fixed in code
+  // Condition is sent to the API (`car.condition`); the engine does not price it yet (§6), the appraiser does.
+  var ACCIDENT = { none: { label: "Không va chạm", api: "none" }, light: { label: "Va chạm nhẹ, đã sửa", api: "light" }, heavy: { label: "Va chạm nặng", api: "heavy" } };
+  var FLOOD = { no: { label: "Không ngập nước", api: false }, yes: { label: "Từng ngập nước", api: true } };
+  var OWNERS = { "1": { label: "1 đời chủ", api: 1 }, "2": { label: "2 đời chủ", api: 2 }, "3": { label: "3 đời chủ trở lên", api: 3 } };
   var DAMAGE_PARTS = ["Cản trước", "Cản sau", "Cửa trái", "Cửa phải", "Nắp capo", "Đèn", "Kính lái", "Nội thất"];
-  var DAMAGE_TYPES = { "Xước": { "Nhẹ": 1, "Vừa": 2, "Nặng": 4 }, "Móp": { "Nhẹ": 2, "Vừa": 4, "Nặng": 8 }, "Nứt, vỡ": { "Nhẹ": 3, "Vừa": 6, "Nặng": 12 } };
+  var DAMAGE_TYPES = ["Xước", "Móp", "Nứt, vỡ"];
+  var LEVELS = ["Nhẹ", "Vừa", "Nặng"];
+  var IMG = { "VF 3": "vf3", "VF 5": "vf5", "VF 6": "vf6", "VF 7": "vf7", "VF 8": "vf8", "VF 9": "vf9" };
+  var DESC = { "VF 2": "Nhỏ gọn đô thị", "VF 3": "Đô thị linh hoạt", "VF 5": "Nhỏ gọn, hiện đại", "VF 6": "Cân bằng đa dụng", "VF 7": "Mạnh mẽ, cá tính", "VF 8": "Tiện nghi vượt trội", "VF 9": "Rộng rãi, đẳng cấp", "VF MPV 7": "Gia đình 7 chỗ", "VF Wild": "Bán tải điện" };
+  var TIER_LABEL = { member: "Thành viên", gold: "Gold", platinum: "Platinum", diamond: "Diamond" };
+  var AUDIENCE_LABEL = { normal: "Khách thường", caqd: "Công an, quân đội" };
+  var DEFAULT_TARGET = "Products-Car-VF7"; // no default province: on-road fees depend on it, so the customer must choose it
+  var NOW_YEAR = new Date().getFullYear();
 
-  function seedRand(str) {
-    var h = 2166136261;
-    for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
-    return function () { h += 0x6D2B79F5; var t = Math.imul(h ^ (h >>> 15), 1 | h); t ^= t + Math.imul(t ^ (t >>> 7), 61 | t); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  function imgFor(label) {
+    var m = String(label || "").match(/^VF \d/);
+    return "assets/img/" + (m && IMG[m[0]] ? IMG[m[0]] : "vf7") + ".jpg";
+  }
+  function descFor(label) { var k = Object.keys(DESC).filter(function (x) { return String(label).indexOf(x) === 0; }).sort(function (a, b) { return b.length - a.length; })[0]; return k ? DESC[k] : "Xe điện VinFast"; }
+
+  /* ---------- API base ----------
+     Order: same origin when this page is served by the API (/web/...) → window.TRADEUP_API (set by whoever deploys the
+     page) → ?api=<url> / saved choice → http://localhost:8000. A hosted copy (GitHub Pages) sets window.TRADEUP_API and
+     needs its origin in CORS_ORIGINS.
+     ?api= and the "Máy chủ API" field only accept a LOCAL server (localhost, 127.0.0.1, [::1]): a link such as
+     ?api=https://other-host must not be able to send the customer's car details and chat to another server, and must not
+     stay remembered for later visits. */
+  var API_KEY = "tradeup.api";
+  var DEFAULT_API = "http://localhost:8000";
+  function clean(u) { return String(u).replace(/\/+$/, ""); }
+  function localApi(u) {
+    try {
+      var x = new URL(String(u));
+      return /^https?:$/.test(x.protocol) && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(x.hostname) ? clean(x.origin) : null;
+    } catch (e) { return null; }
+  }
+  function servedByApi() { return /^https?:$/.test(location.protocol) && /^\/web(\/|$)/.test(location.pathname); }
+  function readApiBase() {
+    var saved = null; try { saved = localStorage.getItem(API_KEY); } catch (e) { /* ignore */ }
+    var fromSaved = saved ? localApi(saved) : null;
+    if (saved && !fromSaved) { try { localStorage.removeItem(API_KEY); } catch (e) { /* ignore */ } }  // drop an old non-local value
+    if (servedByApi()) return location.origin;
+    if (window.TRADEUP_API) return clean(window.TRADEUP_API);
+    var q = null;
+    try { q = new URLSearchParams(location.search).get("api"); } catch (e) { /* old browser */ }
+    var fromQuery = q ? localApi(q) : null;
+    if (fromQuery) { try { localStorage.setItem(API_KEY, fromQuery); } catch (e) { /* private mode */ } return fromQuery; }
+    return fromSaved || DEFAULT_API;
+  }
+  var apiBase = readApiBase();
+  /* Returns true when the new base is used; a non-local URL is refused (the current base stays). */
+  function setApiBase(u) {
+    if (!u) {
+      try { localStorage.removeItem(API_KEY); } catch (e) { /* ignore */ }
+      apiBase = readApiBase();
+      return true;
+    }
+    var local = localApi(u);
+    if (!local || servedByApi() || window.TRADEUP_API) return false;
+    apiBase = local;
+    try { localStorage.setItem(API_KEY, apiBase); } catch (e) { /* ignore */ }
+    return true;
   }
 
-  function damageCost(d) { var t = DAMAGE_TYPES[d.type]; return t && t[d.level] ? t[d.level] : 0; }
-
-  /* Returns {ok:false, reason, compsCount} or the full estimate. */
-  function estimate(car) {
-    var spec = USED[car.brand] && USED[car.brand][car.model];
-    var age = Math.max(0, NOW_YEAR - Number(car.year));
-    var km = Number(car.km) || 0;
-    var rand = seedRand([car.brand, car.model, car.year].join("|"));
-    var compsCount = !spec ? Math.floor(rand() * 3) : age > 13 ? 2 + Math.floor(rand() * 3) : 8 + Math.floor(rand() * 22);
-    if (compsCount < MIN_COMPS) {
-      return { ok: false, compsCount: compsCount, reason: "chỉ có " + compsCount + " xe tương đồng đang rao (cần ít nhất " + MIN_COMPS + ")." };
-    }
-    var listing = spec.base * Math.pow(0.94, age);
-    var expectedKm = age * 12000;
-    var kmAdj = Math.max(-0.10, Math.min(0.10, -((km - expectedKm) / 10000) * 0.008));
-    listing = Math.round(listing * (1 + kmAdj));
-    var negotiation = Math.round(listing * 0.03);
-    var buyMargin = Math.round(listing * 0.08);
-    var condPct = (ACCIDENT[car.accident] || ACCIDENT.none).pct + (FLOOD[car.flood] || FLOOD.no).pct + (OWNERS[car.owners] || OWNERS["1"]).pct;
-    var condition = Math.round(listing * condPct);
-    var photo = (car.damages || []).filter(function (d) { return d.on !== false; }).reduce(function (s, d) { return s + damageCost(d); }, 0);
-    var mid = listing - negotiation - buyMargin - condition - photo;
-    var low = Math.max(20, Math.round(mid * 0.96)), high = Math.max(low + 1, Math.round(mid * 1.04));
-    var comps = [];
-    for (var i = 0; i < Math.min(compsCount, 6); i++) {
-      comps.push({
-        title: car.brand + " " + car.model + " " + (spec.trims[Math.floor(rand() * spec.trims.length)]) + " " + car.year,
-        price: Math.round(listing * (0.93 + rand() * 0.14)),
-        km: Math.max(3000, Math.round((km * (0.7 + rand() * 0.6)) / 1000) * 1000),
-        place: ["Hà Nội", "TP.HCM", "Đà Nẵng", "Hải Phòng", "Bình Dương"][Math.floor(rand() * 5)]
+  /* fetch wrapper: resolves {status, data, headers} for any HTTP answer, rejects {kind:"network"} when the API is unreachable. */
+  function request(method, path, body, timeoutMs) {
+    var ctrl = typeof AbortController === "function" ? new AbortController() : null;
+    var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, timeoutMs || 20000) : null;
+    return fetch(apiBase + path, {
+      method: method,
+      headers: body ? { "Content-Type": "application/json" } : {},
+      body: body ? JSON.stringify(body) : undefined,
+      signal: ctrl ? ctrl.signal : undefined
+    }).then(function (r) {
+      return r.text().then(function (t) {
+        var data = null; try { data = t ? JSON.parse(t) : null; } catch (e) { data = null; }
+        return { status: r.status, data: data, headers: r.headers };
       });
-    }
-    return { ok: true, compsCount: compsCount, comps: comps, listing: listing, negotiation: negotiation, buyMargin: buyMargin, condition: condition, photo: photo, low: low, high: high, dataDate: DATA_DATE, source: COMPS_SOURCE };
+    }, function (err) {
+      throw { kind: "network", message: err && err.name === "AbortError" ? "timeout" : "unreachable" };
+    }).finally(function () { if (timer) clearTimeout(timer); });
   }
 
-  function vinfast(name) { for (var i = 0; i < VINFAST.length; i++) if (VINFAST[i].name === name) return VINFAST[i]; return VINFAST[3]; }
-
-  /* Top-up at both ends of the used-car range. */
-  function topUp(est, targetName) {
-    var m = vinfast(targetName);
-    return { model: m, list: m.price, promo: m.promo, low: Math.max(0, m.price - m.promo - est.high), high: Math.max(0, m.price - m.promo - est.low) };
+  var cache = {};
+  function cached(key, fn) {
+    if (cache[key]) return cache[key];
+    cache[key] = fn().then(function (r) { if (r.status !== 200 || !r.data || !r.data.ok) { delete cache[key]; throw { kind: "http", status: r.status, data: r.data }; } return r.data; }, function (e) { delete cache[key]; throw e; });
+    return cache[key];
   }
+  var api = {
+    base: function () { return apiBase; },
+    setBase: function (u) { var ok = setApiBase(u); cache = {}; return ok; },
+    health: function () { return request("GET", "/health", null, 4000); },
+    options: function () { return cached("options", function () { return request("GET", "/api/v1/options"); }); },
+    vinfastModels: function () { return cached("vf", function () { return request("GET", "/api/v1/vinfast-models"); }); },
+    checkInput: function (car) { return request("POST", "/api/v1/valuations/check-input", { car: car }); },
+    valuate: function (body) { return request("POST", "/api/v1/valuations", body, 30000); },
+    chat: function (body) { return request("POST", "/api/v1/trade-in/chat", body, 60000); }
+  };
 
-  function installment(principal, months) {
-    if (principal <= 0) return 0;
-    var r = LOAN.monthlyRate, f = Math.pow(1 + r, months);
-    return principal * (r * f) / (f - 1);
+  /* ---------- request bodies (draft → API) ---------- */
+  function carBody(d) {
+    var car = { brand: d.brand, model: d.model };
+    if (d.year) car.year = Number(d.year);
+    if (d.km !== "" && d.km != null) car.mileage_km = Number(d.km);
+    if (d.trim && d.trim !== "Không rõ") car.variant = d.trim;
+    if (d.fuel) car.fuel = d.fuel;
+    var cond = {};
+    if (ACCIDENT[d.accident]) cond.accident = ACCIDENT[d.accident].api;
+    if (FLOOD[d.flood]) cond.flooded = FLOOD[d.flood].api;
+    if (OWNERS[d.owners]) cond.owner_count = OWNERS[d.owners].api;
+    if (Object.keys(cond).length) car.condition = cond;
+    return car;
   }
-  function monthly(top, downPct, months) {
-    var k = 1 - downPct / 100;
-    return { low: installment(top.low * k, months), high: installment(top.high * k, months) };
+  function quoteBody(d) {
+    var body = { car: carBody(d), target: { model_id: d.targetId, edition_code: d.edition } };
+    if (d.province) body.target.province = d.province;
+    var c = d.customer || {}, cust = {};
+    Object.keys(c).forEach(function (k) { if (c[k] !== null && c[k] !== undefined && c[k] !== "") cust[k] = c[k]; });
+    if (Object.keys(cust).length) body.customer = cust;
+    body.loan = { down_payment_pct: Number(d.down), term_months: Number(d.term) };
+    return body;
   }
+  function outcome(resp) { return (resp && resp.result && resp.result.outcome) || {}; }
 
-  /* Returns a question for the customer when km looks wrong for the year, else null. Never corrects the value itself. */
-  function kmCheck(year, km) {
-    var age = Math.max(0, NOW_YEAR - Number(year));
-    km = Number(km);
-    if (!isFinite(km) || km < 0) return null;
-    if (km > age * 35000 + 30000) return "Xe " + year + " mà đi " + fmtInt(km) + " km là cao bất thường. Bạn kiểm tra lại nhé?";
-    if (age >= 3 && km < 1000) return "Xe " + year + " mà mới đi " + fmtInt(km) + " km là thấp bất thường. Bạn kiểm tra lại nhé?";
-    return null;
-  }
+  /* Edition helpers over GET /vinfast-models. */
+  function findModel(models, id) { for (var i = 0; i < models.length; i++) if (models[i].model_id === id) return models[i]; return null; }
+  function activeEditions(m) { return (m && m.editions || []).filter(function (e) { return e.active !== false; }); }
+  function defaultEdition(m) { var e = activeEditions(m); return e.length ? e[0].edition_code : ""; }
 
+  /* ---------- free text → fields (structure only, no money) ---------- */
   function strip(s) { return String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d"); }
-
-  /* Free text -> structured fields. Only fills what it finds. */
-  function parseFreeText(text) {
+  /* brands: GET /options result.brands ([{brand, models:[{model}]}]). Only fills what it finds. */
+  function parseFreeText(text, brands) {
     var t = strip(text), out = {};
-    Object.keys(USED).forEach(function (b) {
-      Object.keys(USED[b]).forEach(function (m) {
-        if (t.indexOf(strip(m)) !== -1 && (!out.model || m.length > out.model.length)) { out.brand = b; out.model = m; }
+    (brands || []).forEach(function (b) {
+      (b.models || []).forEach(function (m) {
+        var name = strip(m.model);
+        if (new RegExp("(^|[^a-z0-9])" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "([^a-z0-9]|$)").test(t) && (!out.model || m.model.length > out.model.length)) { out.brand = b.brand; out.model = m.model; }
       });
-      if (!out.brand && t.indexOf(strip(b)) !== -1) out.brand = b;
+      if (!out.brand && new RegExp("\\b" + strip(b.brand) + "\\b").test(t)) out.brand = b.brand;
     });
-    var y = t.match(/\b(19[9]\d|20[0-2]\d)\b/); if (y) out.year = Number(y[1]);
-    var van = t.match(/(\d+(?:[.,]\d+)?)\s*van/), km = t.match(/(\d[\d.,]*)\s*(?:km|cay)/), k = t.match(/\b(\d{2,3})k\b/);
+    var y = t.match(/\b(19[89]\d|20[0-4]\d)\b/); if (y) out.year = Number(y[1]);
+    var van = t.match(/(\d+(?:[.,]\d+)?)\s*van\b/), km = t.match(/(\d{1,3}(?:[.,]\d{3})+|\d+)\s*(?:km|cay so|cay)\b/), k = t.match(/\b(\d{2,3})\s?k\b/);
     if (van) out.km = Math.round(parseFloat(van[1].replace(",", ".")) * 10000);
     else if (km) out.km = Number(km[1].replace(/[.,]/g, ""));
     else if (k) out.km = Number(k[1]) * 1000;
-    if (out.brand && out.model) {
-      var trims = USED[out.brand][out.model].trims, bm = t.match(/ban\s+([a-z0-9.]+)/);
-      if (bm) trims.forEach(function (tr) { if (strip(tr).indexOf(bm[1]) !== -1 && !out.trim) out.trim = tr; });
-    }
+    var bm = String(text).match(/b[aả]n\s+([A-Za-z0-9.\- ]{1,12}?)(?=[,.;]|\s+(?:đi|di|chạy|chay|xe|muốn|muon|\d)|$)/i);
+    if (bm) out.trim = bm[1].trim();
+    var fuel = readFuel(t); if (fuel) out.fuel = fuel;
+    return out;
+  }
+  function readFuel(t) {
+    if (/\bhybrid\b|\bhev\b/.test(t)) return "hybrid";
+    if (/\bxe (chay )?dau\b|\bmay dau\b|\bdiesel\b|\bchay dau\b/.test(t)) return "dau";
+    if (/\bxang\b/.test(t)) return "xang";
+    return "";
+  }
+  /* "trả trước 30%", "vay 5 năm", "60 tháng" → loan selector. These are the customer's inputs, not money. */
+  function parseLoan(text) {
+    var t = strip(text), out = {};
+    var dp = t.match(/tra truoc\s*(\d{1,2})\s*(%|phan tram)/) || t.match(/(\d{1,2})\s*%\s*tra truoc/);
+    if (dp) out.down = Number(dp[1]);
+    var yr = t.match(/(?:vay|trong|ky han|tra gop)\s*(\d{1,2})\s*nam/), mo = t.match(/(\d{2,3})\s*thang/);
+    if (yr) out.term = Number(yr[1]) * 12; else if (mo) out.term = Number(mo[1]);
     return out;
   }
 
-  function fmtInt(n) { return new Intl.NumberFormat("vi-VN").format(Math.round(n)); }
-  function fmtTr(n) { return fmtInt(n) + " triệu"; }
-  function fmtRange(a, b) { return a === b ? fmtTr(a) : fmtInt(a) + " – " + fmtInt(b) + " triệu"; }
+  /* ---------- formatting only ---------- */
+  function fmtInt(n) { return n == null || n === "" || isNaN(n) ? "—" : new Intl.NumberFormat("vi-VN").format(Math.round(Number(n))); }
+  function fmtVnd(n) { return n == null ? "—" : fmtInt(n) + " đ"; }
+  function fmtRange(a, b) { return a == null || b == null ? "—" : a === b ? fmtVnd(a) : fmtInt(a) + " – " + fmtInt(b) + " đ"; }
+  function fmtTr(n) { return n == null ? "—" : new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(Number(n) / 1e6) + " triệu"; }
+  function fmtTrRange(a, b) { return a == null || b == null ? "—" : a === b ? fmtTr(a) : new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(a / 1e6) + " – " + fmtTr(b); }
+  function fmtPct(n) { return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 }).format(n) + "%"; }
+  /* Customer-facing name of the data behind a quote. The API's data_source is an internal label (fixtures / CAR_DATA_DIR), never shown. */
+  function sourceLabel(q) { return q && q.is_synthetic ? "Dữ liệu mẫu để thử nghiệm" : "Dữ liệu tin rao công khai"; }
+  function fmtDate(iso) { if (!iso) return ""; var p = String(iso).slice(0, 10).split("-"); return p.length === 3 ? p[2] + "/" + p[1] + "/" + p[0] : String(iso); }
   function fmtDec(n) { return new Intl.NumberFormat("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(n); }
-  function fmtRate() { return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 }).format(LOAN.monthlyRate * 100) + "%/tháng"; }
-  function fmtMonthly(m) { return Math.abs(m.low - m.high) < 0.05 ? fmtDec(m.low) + " triệu" : fmtDec(m.low) + " – " + fmtDec(m.high) + " triệu"; }
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  /* Server text → paragraphs, always escaped (agent answers are shown verbatim, §7 rule 1). */
+  function paras(text) { return String(text || "").split(/\n{2,}/).map(function (p) { return "<p>" + esc(p).replace(/\n/g, "<br>") + "</p>"; }).join(""); }
+  /* Only official VinFast / press links from the engine are shown; never listing URLs (§5.5). */
+  function safeUrl(u) { return /^https:\/\/[^\s"'<>]+$/.test(String(u || "")) ? u : ""; }
 
   window.TU = {
-    NOW_YEAR: NOW_YEAR, DATA_DATE: DATA_DATE, MIN_COMPS: MIN_COMPS, USED: USED, VINFAST: VINFAST, PROMO: PROMO, LOAN: LOAN, DEALERS: DEALERS, SLOTS: SLOTS,
-    ACCIDENT: ACCIDENT, FLOOD: FLOOD, OWNERS: OWNERS, DAMAGE_PARTS: DAMAGE_PARTS, DAMAGE_TYPES: DAMAGE_TYPES,
-    estimate: estimate, topUp: topUp, monthly: monthly, vinfast: vinfast, kmCheck: kmCheck, parseFreeText: parseFreeText, damageCost: damageCost,
-    fmtInt: fmtInt, fmtTr: fmtTr, fmtRange: fmtRange, fmtMonthly: fmtMonthly, fmtDec: fmtDec, fmtRate: fmtRate, esc: esc
+    NOW_YEAR: NOW_YEAR, DEALERS: DEALERS, SLOTS: SLOTS, ACCIDENT: ACCIDENT, FLOOD: FLOOD, OWNERS: OWNERS,
+    DAMAGE_PARTS: DAMAGE_PARTS, DAMAGE_TYPES: DAMAGE_TYPES, LEVELS: LEVELS, TIER_LABEL: TIER_LABEL, AUDIENCE_LABEL: AUDIENCE_LABEL,
+    DEFAULT_TARGET: DEFAULT_TARGET,
+    api: api, carBody: carBody, quoteBody: quoteBody, outcome: outcome,
+    findModel: findModel, activeEditions: activeEditions, defaultEdition: defaultEdition, imgFor: imgFor, descFor: descFor,
+    parseFreeText: parseFreeText, parseLoan: parseLoan, strip: strip,
+    fmtInt: fmtInt, fmtVnd: fmtVnd, fmtRange: fmtRange, fmtTr: fmtTr, fmtTrRange: fmtTrRange, fmtPct: fmtPct, fmtDate: fmtDate, sourceLabel: sourceLabel, fmtDec: fmtDec,
+    esc: esc, paras: paras, safeUrl: safeUrl
   };
 })();
