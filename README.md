@@ -1,5 +1,7 @@
 # TradeUp — giao diện web
 
+> **Bản GitHub Pages này** gọi API trên Render: https://tradeup-api-s0lb.onrender.com (đặt trong `assets/js/config.js`; repo deploy `minhiuss/tradeup-api`). Gói free ngủ sau 15 phút không dùng, lần mở đầu chờ khoảng 1 phút. Khi đồng bộ lại `web/` từ P-029, giữ `config.js` và dòng `<script src="assets/js/config.js">` trong 3 trang.
+
 Giao diện khách hàng và bàn thẩm định viên, **nối API thật** (hợp đồng: [docs/ui-integration.md](../docs/ui-integration.md)).
 Mọi số tiền do engine trên máy chủ tính; trang chỉ định dạng và hiển thị (không cộng trừ tiền ở trình duyệt).
 Không build, không framework.
